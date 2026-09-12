@@ -7,3 +7,8 @@ afterEach(() => {
   cleanup();
   clearMocks();
 });
+
+// jsdom has no native modal implementation; the browser handles focus trapping/Escape.
+HTMLDialogElement.prototype.showModal = function () {
+  this.setAttribute("open", "");
+};

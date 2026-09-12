@@ -1,0 +1,69 @@
+{
+  "initial": {
+    "generation": 0,
+    "demo": false,
+    "connected": false,
+    "operation": null,
+    "reading": null,
+    "cleared": false,
+    "incident": null,
+    "error": null
+  },
+  "read": {
+    "generation": 1,
+    "demo": true,
+    "connected": true,
+    "operation": null,
+    "reading": [
+      {
+        "code": "DEMO-001",
+        "description": "Capteur de température fictif : signal incohérent"
+      },
+      {
+        "code": "DEMO-002",
+        "description": "Circuit d’admission fictif : débit insuffisant"
+      },
+      {
+        "code": "DEMO-003",
+        "description": "Alimentation fictive : tension trop faible"
+      }
+    ],
+    "cleared": false,
+    "incident": null,
+    "error": null
+  },
+  "cleared": {
+    "generation": 1,
+    "demo": true,
+    "connected": true,
+    "operation": null,
+    "reading": null,
+    "cleared": true,
+    "incident": null,
+    "error": null
+  },
+  "empty": {
+    "generation": 1,
+    "demo": true,
+    "connected": true,
+    "operation": null,
+    "reading": [],
+    "cleared": false,
+    "incident": null,
+    "error": null
+  },
+  "interrupted": {
+    "generation": 2,
+    "demo": true,
+    "connected": false,
+    "operation": null,
+    "reading": null,
+    "cleared": false,
+    "incident": null,
+    "error": "connection_interrupted"
+  },
+  "clearAction": {
+    "type": "clear",
+    "confirmed": true
+  }
+}

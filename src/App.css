@@ -283,3 +283,116 @@ a:focus-visible {
     font-size: 10px;
   }
 }
+
+.demo-panel {
+  padding: 18px 22px;
+  margin-bottom: 24px;
+  border: 1px solid #c8dcd1;
+  border-radius: 12px;
+  background: #fff;
+}
+.demo-panel p {
+  color: #52746a;
+  font-size: 13px;
+}
+.demo-banner {
+  display: block;
+  color: #08634f;
+}
+.demo-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+}
+.demo-controls label {
+  display: grid;
+  gap: 5px;
+  font-size: 12px;
+}
+select {
+  font: inherit;
+  padding: 9px;
+  border: 1px solid #c8dcd1;
+  border-radius: 6px;
+  background: #fff;
+  color: #192d34;
+}
+button:not(:disabled) {
+  cursor: pointer;
+}
+.button-primary:not(:disabled) {
+  background: #087c64;
+  border-color: #087c64;
+  color: #fff;
+}
+.button-secondary:not(:disabled) {
+  color: #285a49;
+}
+button:focus-visible,
+select:focus-visible {
+  outline: 2px solid #087c64;
+  outline-offset: 3px;
+}
+.connection-card {
+  flex-wrap: wrap;
+}
+.connection-card > .buttons {
+  flex-basis: 100%;
+}
+.buttons {
+  flex-wrap: wrap;
+}
+.results > p,
+.results > h3 {
+  padding: 24px;
+  margin: 0;
+}
+.code-list {
+  list-style: none;
+  margin: 0;
+  padding: 8px 26px;
+}
+.code-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px 0;
+  border-bottom: 1px solid #edf0ee;
+}
+.code-list strong {
+  color: #087c64;
+}
+.code-list small {
+  color: #65756f;
+  margin-left: auto;
+}
+.error-message {
+  border: 1px solid #dcb8ac;
+  border-radius: 8px;
+  background: #fff5ee;
+  padding: 16px;
+  color: #833c2a;
+}
+dialog {
+  max-width: 480px;
+  width: calc(100% - 64px);
+  border: 1px solid #c8dcd1;
+  border-radius: 12px;
+  padding: 26px;
+  color: #192d34;
+}
+dialog::backdrop {
+  background: #192d3480;
+}
+dialog h2 {
+  font-size: 20px;
+}
+dialog p {
+  font-size: 14px;
+}
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
