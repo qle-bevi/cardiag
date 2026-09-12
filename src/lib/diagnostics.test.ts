@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fixtures from "../../tests/fixtures/demo-session.json";
-import { parseSession } from "./diagnostics";
+import { mockIPC } from "@tauri-apps/api/mocks";
+import { getDemoAvailable, parseSession } from "./diagnostics";
 
 describe("contrat IPC Rust/TypeScript", () => {
   it("accepte les états produits par Rust", () => {
@@ -19,4 +20,20 @@ describe("contrat IPC Rust/TypeScript", () => {
   ])("rejette une réponse malformée : %j", (value) => {
     expect(() => parseSession(value)).toThrow("Contrat de session invalide");
   });
+});
+
+describe("disponibilité native de la démo", () => {
+  it.each([true, false])("accepte la politique %s", async (value) => {
+    mockIPC(() => value);
+    await expect(getDemoAvailable()).resolves.toBe(value);
+  });
+  it.each([null, "true", 1, {}])(
+    "rejette une politique malformée : %j",
+    async (value) => {
+      mockIPC(() => value);
+      await expect(getDemoAvailable()).rejects.toThrow(
+        "Contrat de disponibilité invalide",
+      );
+    },
+  );
 });

@@ -1,57 +1,33 @@
 import { useEffect, useRef, useState } from "react";
 import { type Action, type Incident } from "./lib/diagnostics";
 import { useDiagnosticSession } from "./lib/useDiagnosticSession";
+import { systems, type Page } from "./lib/systems";
+import { Icon } from "./components/Icon";
+import { TitleBar } from "./components/TitleBar";
+import { VehicleIllustration } from "./components/VehicleIllustration";
+import { Diagnostics, ConfirmClear } from "./components/Diagnostics";
 import "./App.css";
 
-function ConfirmClear({
-  onCancel,
-  onConfirm,
-}: {
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  const dialog = useRef<HTMLDialogElement>(null);
-  const cancel = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    dialog.current?.showModal();
-    cancel.current?.focus();
-  }, []);
-  return (
-    <dialog
-      ref={dialog}
-      aria-labelledby="confirm-title"
-      aria-describedby="confirm-description"
-      onCancel={(event) => {
-        event.preventDefault();
-        onCancel();
-      }}
-    >
-      <h2 id="confirm-title">Effacer les défauts simulés ?</h2>
-      <p id="confirm-description">
-        Cette opération supprime uniquement les défauts du véhicule fictif.
-        Toutes les données et opérations sont simulées. Une nouvelle lecture
-        sera nécessaire pour vérifier le résultat.
-      </p>
-      <div className="buttons">
-        <button ref={cancel} className="button-secondary" onClick={onCancel}>
-          Annuler
-        </button>
-        <button className="button-primary" onClick={onConfirm}>
-          Confirmer l’effacement simulé
-        </button>
-      </div>
-    </dialog>
-  );
-}
-
 function App() {
-  const { session, busy, error, available, run } = useDiagnosticSession();
+  const { session, busy, error, available, demoAvailable, run } =
+    useDiagnosticSession();
+  const [page, setPage] = useState<Page>("overview");
   const [confirming, setConfirming] = useState(false);
   const clearButton = useRef<HTMLButtonElement>(null);
+  const pageHeading = useRef<HTMLElement>(null);
+  const wasConfirming = useRef(false);
   useEffect(() => {
-    if (!confirming) clearButton.current?.focus();
+    if (wasConfirming.current && !confirming) {
+      if (clearButton.current && !clearButton.current.disabled)
+        clearButton.current.focus();
+      else pageHeading.current?.focus();
+    }
+    wasConfirming.current = confirming;
   }, [confirming]);
-  const demo = session?.demo ?? false;
+  const demo = demoAvailable && (session?.demo ?? false);
+  const visibleSystems = systems.map((item) =>
+    demoAvailable ? item : { ...item, availability: "unavailable" as const },
+  );
   const connected = session?.connected ?? false;
   const interruptible =
     available && (!busy || ["connect", "read", "clear"].includes(busy));
@@ -59,6 +35,11 @@ function App() {
   const act = (action: Action) => {
     setConfirming(false);
     void run(action);
+  };
+  const navigate = (next: Page) => {
+    setPage(next);
+    pageHeading.current?.scrollTo?.({ top: 0 });
+    pageHeading.current?.focus();
   };
   const cancelClear = () => {
     setConfirming(false);
@@ -75,234 +56,458 @@ function App() {
             : connected
               ? "Véhicule fictif connecté"
               : "Véhicule fictif déconnecté";
+  const reading = session?.reading;
+  const readingSummary =
+    busy === "read"
+      ? "Lecture en cours…"
+      : busy === "clear"
+        ? "Effacement en cours…"
+        : reading
+          ? `${reading.length} défaut${reading.length > 1 ? "s" : ""} simulé${reading.length > 1 ? "s" : ""}`
+          : session?.cleared
+            ? "Relecture nécessaire"
+            : "Aucune lecture effectuée";
+  const system = systems.find((item) => item.id === page);
+  const activate = demoAvailable && (
+    <button
+      className="button-primary"
+      disabled={!available || !!busy}
+      onClick={() => act({ type: "activate" })}
+    >
+      <Icon name="flask" />
+      Activer le mode démo
+    </button>
+  );
 
   return (
     <div className="app-shell">
-      <header className="app-header">
-        <a className="brand" href="#main" aria-label="Cardiag, accueil">
-          <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
-            <path d="M5 21V15L8 8H24L27 15V21M5 15H27M9 21H23M9 21V25M23 21V25" />
-            <path d="M9 18H12M20 18H23" />
-          </svg>
-          cardiag<span className="brand-dot">.</span>
-        </a>
-        <span className="version-badge">
-          {demo ? "Mode démo · Tout est simulé" : "Version de développement"}
-        </span>
-      </header>
-
-      <main id="main">
-        <section className="demo-panel" aria-label="Mode démo">
-          {demo ? (
-            <>
-              <strong className="demo-banner">
-                Mode démo — toutes les données et opérations sont simulées
-              </strong>
-              <p>
-                Véhicule fictif de démonstration · Aucun lien avec votre
-                Octavia.
-              </p>
-              <div className="demo-controls">
-                <button
-                  disabled={!interruptible}
-                  onClick={() => act({ type: "deactivate" })}
-                >
-                  Quitter le mode démo
-                </button>
-                <button
-                  disabled={!interruptible}
-                  onClick={() => act({ type: "reset" })}
-                >
-                  Réinitialiser le scénario
-                </button>
-                <label>
-                  Incident à la prochaine opération
-                  <select
-                    disabled={!available || !!busy || confirming}
-                    value={session?.incident ?? ""}
-                    onChange={(event) =>
-                      act({
-                        type: "arm_incident",
-                        incident: (event.target.value ||
-                          null) as Incident | null,
-                      })
-                    }
-                  >
-                    <option value="">Aucun incident</option>
-                    <option value="no_response">Absence de réponse</option>
-                    <option value="connection_interrupted">
-                      Connexion interrompue
-                    </option>
-                  </select>
-                </label>
-              </div>
-            </>
-          ) : (
-            <>
-              <p>Testez le parcours avec un véhicule fictif, sans câble.</p>
-              <button
-                className="button-primary"
-                disabled={!available || !!busy}
-                onClick={() => act({ type: "activate" })}
-              >
-                Activer le mode démo
-              </button>
-            </>
-          )}
-        </section>
-        {error && (
-          <p className="error-message" role="alert">
-            {error}
-          </p>
-        )}
-        <div className="page-heading">
-          <p className="eyebrow">VOTRE ESPACE DIAGNOSTIC</p>
-          <h1>Comprendre votre véhicule.</h1>
-          <p className="lead">
-            Un point de départ pour lire et comprendre les défauts moteur.
-          </p>
-        </div>
-
-        <section className="connection-card" aria-labelledby="connection-title">
-          <div className="connection-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none">
-              <path d="M8 3V7M16 3V7M6 7H18V11A6 6 0 0 1 6 11V7ZM12 17V22" />
-            </svg>
-          </div>
+      <a href="#main" className="skip-link">
+        Aller au contenu
+      </a>
+      <TitleBar demo={demo} connected={connected} />
+      <div className="app-body">
+        <nav className="sidebar" aria-label="Navigation principale">
           <div>
-            <p className="card-label" id="connection-title">
-              Connexion au véhicule
-            </p>
-            <h2 role="status" aria-live="polite">
-              {status}
-            </h2>
-            <p className="muted">
-              {demo
-                ? "Véhicule fictif de démonstration — connexion simulée."
-                : "La prise en charge du câble sera ajoutée dans une prochaine étape."}
-            </p>
-          </div>
-          <span className="status-pill">
-            <span />
-            {connected ? "En ligne · simulé" : "Hors ligne"}
-          </span>
-          {demo && (
-            <div className="buttons">
+            <p className="nav-label">ESPACE DE TRAVAIL</p>
+            <button
+              className={`nav-item ${page === "overview" ? "active" : ""}`}
+              aria-current={page === "overview" ? "page" : undefined}
+              aria-label="Vue d’ensemble"
+              title="Vue d’ensemble"
+              onClick={() => navigate("overview")}
+            >
+              <Icon name="grid" />
+              <span>Vue d’ensemble</span>
+            </button>
+            <p className="nav-label system-label">SYSTÈMES DU VÉHICULE</p>
+            {visibleSystems.map((item) => (
               <button
-                className="button-primary"
-                disabled={!available || !!busy || connected || confirming}
-                onClick={() => act({ type: "connect" })}
+                key={item.id}
+                className={`nav-item ${page === item.id ? "active" : ""}`}
+                aria-current={page === item.id ? "page" : undefined}
+                aria-label={item.label}
+                title={`${item.label}${item.availability === "unavailable" ? " · Non disponible" : ""}`}
+                onClick={() => navigate(item.id)}
               >
-                Connecter le véhicule simulé
+                <Icon name={item.icon} />
+                <span>{item.label}</span>
+                {item.availability === "unavailable" ? (
+                  <span className="nav-unavailable" aria-hidden="true">
+                    —
+                  </span>
+                ) : (
+                  <span className="nav-indicator" />
+                )}
               </button>
-              <button
-                className="button-secondary"
-                disabled={!interruptible || (!connected && busy !== "connect")}
-                onClick={() => act({ type: "disconnect" })}
-              >
-                Déconnecter
-              </button>
-            </div>
-          )}
-        </section>
-
-        <section
-          className="diagnostics-card"
-          aria-labelledby="diagnostics-title"
-        >
-          <div className="section-header">
-            <div>
-              <p className="eyebrow">OBD-II / EOBD</p>
-              <h2 id="diagnostics-title">Codes de défaut moteur</h2>
-            </div>
-            <span className="subtle-tag">
-              {session?.reading !== null && session?.reading !== undefined
-                ? "Lecture simulée effectuée"
-                : "Diagnostic non effectué"}
-            </span>
+            ))}
           </div>
-          <div
-            className="results"
-            aria-live="polite"
-            aria-busy={busy === "read" || busy === "clear"}
+          <div className="sidebar-bottom">
+            {demoAvailable && (
+              <button
+                className={`nav-item ${page === "demo" ? "active" : ""}`}
+                aria-current={page === "demo" ? "page" : undefined}
+                aria-label="Démonstration"
+                title="Démonstration"
+                onClick={() => navigate("demo")}
+              >
+                <Icon name="flask" />
+                <span>Démonstration</span>
+              </button>
+            )}
+            <div className="local-note">
+              <Icon name="shield" />
+              <div>
+                Votre diagnostic, en local.
+                <small>Sans compte. Sans télémétrie.</small>
+              </div>
+            </div>
+            <div className="sidebar-version">
+              <span>CARDIAG</span>
+              <span>v0.1{demoAvailable ? " · Développement" : ""}</span>
+            </div>
+          </div>
+        </nav>
+        <div className="workspace">
+          <section
+            className="connection-strip"
+            aria-label="Connexion au véhicule"
           >
-            {busy === "read" ? (
-              <p>Lecture des défauts simulés…</p>
-            ) : busy === "clear" ? (
-              <p>Effacement simulé en cours…</p>
-            ) : session?.reading ? (
-              session.reading.length ? (
-                <ul className="code-list">
-                  {session.reading.map((code) => (
-                    <li key={code.code}>
-                      <strong>{code.code}</strong>
-                      <span>{code.description}</span>
-                      <small>Défaut fictif</small>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <h3>Aucun défaut relevé dans le véhicule simulé</h3>
-              )
+            <span
+              className={`connection-symbol ${connected ? "connected" : ""}`}
+            >
+              <Icon name="plug" />
+            </span>
+            <div className="connection-text">
+              <span className="micro-label">
+                {demo ? "SIMULATEUR LOCAL" : "CONNEXION AU VÉHICULE"}
+              </span>
+              <p role="status" aria-live="polite">
+                {status}
+              </p>
+            </div>
+            {demo ? (
+              <div className="buttons">
+                {(!connected || busy === "connect") && (
+                  <button
+                    className="button-secondary"
+                    disabled={!available || !!busy || confirming}
+                    onClick={() => act({ type: "connect" })}
+                  >
+                    Connecter le véhicule simulé
+                    <Icon name="arrow" />
+                  </button>
+                )}
+                {(connected || busy === "connect") && (
+                  <button
+                    className="button-secondary"
+                    disabled={!interruptible}
+                    onClick={() => act({ type: "disconnect" })}
+                  >
+                    Déconnecter
+                  </button>
+                )}
+              </div>
             ) : (
-              <div className="empty-state">
-                <h3>
-                  {session?.cleared
-                    ? "Effacement simulé réussi — relisez les codes pour vérifier"
-                    : "Aucune lecture effectuée"}
-                </h3>
-                <p>
-                  {demo
-                    ? "Les défauts fictifs apparaîtront ici après une lecture réussie."
-                    : "Activez le mode démo pour tester le parcours. La connexion matérielle n’est pas encore disponible."}
-                </p>
+              <span className="connection-hint">
+                Aucun matériel pris en charge pour le moment
+              </span>
+            )}
+          </section>
+          <main id="main" ref={pageHeading} tabIndex={-1}>
+            {error && (
+              <p className="error-message" role="alert">
+                <Icon name="alert" />
+                {error}
+              </p>
+            )}
+            {page === "overview" && (
+              <>
+                <div className="page-heading">
+                  <div>
+                    <p className="eyebrow">VOTRE ESPACE DIAGNOSTIC</p>
+                    <h1>
+                      Vue d’ensemble<span className="heading-dot">.</span>
+                    </h1>
+                    <p className="lead">
+                      Un regard précis sur les systèmes de votre véhicule.
+                    </p>
+                  </div>
+                  <span className="tag">Application locale</span>
+                </div>
+                <section
+                  className="vehicle-card"
+                  aria-labelledby="vehicle-title"
+                >
+                  <div className="vehicle-copy">
+                    <span className="tag">
+                      <span className={`status-dot ${demo ? "online" : ""}`} />
+                      {demo
+                        ? "ENVIRONNEMENT SIMULÉ"
+                        : "PRÊT POUR L’EXPLORATION"}
+                    </span>
+                    <h2 id="vehicle-title">
+                      {demo
+                        ? "Véhicule de démonstration"
+                        : "Votre prochain diagnostic commence ici."}
+                    </h2>
+                    <p>
+                      {demo
+                        ? "Explorez le diagnostic moteur avec un véhicule fictif, sans câble ni matériel."
+                        : "Retrouvez les systèmes du véhicule dans un espace pensé pour aller à l’essentiel."}
+                    </p>
+                    {demo ? (
+                      <button
+                        className="button-primary"
+                        onClick={() => navigate("engine")}
+                      >
+                        Ouvrir le diagnostic moteur
+                        <Icon name="arrow" />
+                      </button>
+                    ) : demoAvailable ? (
+                      activate
+                    ) : (
+                      <button
+                        className="button-primary"
+                        onClick={() => navigate("engine")}
+                      >
+                        Ouvrir le diagnostic moteur
+                        <Icon name="arrow" />
+                      </button>
+                    )}
+                  </div>
+                  <VehicleIllustration />
+                  <span className="illustration-caption">
+                    ILLUSTRATION · VÉHICULE GÉNÉRIQUE
+                  </span>
+                </section>
+                <div className="overview-stats">
+                  <div>
+                    <span className="micro-label">SESSION</span>
+                    <strong>{demo ? "Démonstration" : "Non démarrée"}</strong>
+                    <span>
+                      {demo
+                        ? "Toutes les opérations sont simulées"
+                        : demoAvailable
+                          ? "Activez la démo pour explorer"
+                          : "Aucun véhicule connecté"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="micro-label">DIAGNOSTIC MOTEUR</span>
+                    <strong className={reading?.length ? "text-warning" : ""}>
+                      {readingSummary}
+                    </strong>
+                    <span>
+                      {reading
+                        ? "Résultat du simulateur"
+                        : "Aucun résultat matériel"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="micro-label">DISPONIBILITÉ</span>
+                    <strong>
+                      {demoAvailable
+                        ? "Moteur en démo"
+                        : "Connexion matérielle à venir"}
+                    </strong>
+                    <span>Autres systèmes à venir</span>
+                  </div>
+                </div>
+                <div className="section-heading">
+                  <h2>Systèmes du véhicule</h2>
+                  <span>Choisissez un système pour l’explorer</span>
+                </div>
+                <div className="system-grid">
+                  {visibleSystems.map((item) => (
+                    <button
+                      key={item.id}
+                      className={`system-card ${item.availability === "demo" ? "supported" : ""}`}
+                      onClick={() => navigate(item.id)}
+                    >
+                      <span className="system-icon">
+                        <Icon name={item.icon} />
+                      </span>
+                      <span className="system-card-text">
+                        <strong>{item.label}</strong>
+                        <span>{item.description}</span>
+                      </span>
+                      <span
+                        className={`system-availability ${item.availability === "demo" ? "text-cyan" : ""}`}
+                      >
+                        {item.availability === "demo"
+                          ? "Disponible en démo"
+                          : "Non disponible"}
+                      </span>
+                      <Icon name="chevron" />
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+            {page === "engine" && demoAvailable && !demo && (
+              <div className="engine-demo-prompt">
+                <p>Explorez le diagnostic avec un véhicule fictif.</p>
+                {activate}
               </div>
             )}
-          </div>
-          <div className="diagnostic-actions">
-            <p id="actions-help">
-              {demo
-                ? "Toutes les lectures et tous les effacements sont simulés."
-                : "Lecture et effacement matériels non disponibles."}
-            </p>
-            <div className="buttons">
-              <button
-                className="button-primary"
-                disabled={!ready || confirming}
-                aria-describedby="actions-help"
-                onClick={() => act({ type: "read" })}
-              >
-                Lire les codes
-              </button>
-              <button
-                className="button-secondary"
-                ref={clearButton}
-                onClick={() => setConfirming(true)}
-                disabled={!ready || confirming || !session?.reading?.length}
-                aria-describedby="actions-help"
-              >
-                Effacer les codes
-              </button>
-            </div>
-          </div>
-        </section>
-
-        {confirming && (
-          <ConfirmClear
-            onCancel={cancelClear}
-            onConfirm={() => act({ type: "clear", confirmed: true })}
-          />
-        )}
-        <footer className="app-footer">
-          <span>
-            <span className="footer-dot" />
-            Application locale · Sans compte
-          </span>
-          <span>Cardiag · Diagnostic automobile</span>
-        </footer>
-      </main>
+            {page === "engine" && (
+              <Diagnostics
+                demoAvailable={demoAvailable}
+                session={session}
+                busy={busy}
+                ready={ready}
+                confirming={confirming}
+                onRead={() => act({ type: "read" })}
+                onClear={() => setConfirming(true)}
+                clearButton={clearButton}
+              />
+            )}
+            {system?.availability === "unavailable" && (
+              <>
+                <div className="page-heading">
+                  <div>
+                    <p className="eyebrow">SYSTÈMES DU VÉHICULE</p>
+                    <h1>
+                      {system.label}
+                      <span className="heading-dot">.</span>
+                    </h1>
+                    <p className="lead">{system.description}</p>
+                  </div>
+                  <span className="tag">Non disponible</span>
+                </div>
+                <section className="panel unavailable-state">
+                  <span className="empty-icon">
+                    <Icon name={system.icon} />
+                  </span>
+                  <h2>Système non pris en charge actuellement</h2>
+                  <p>
+                    La lecture et l’effacement des défauts de ce système ne sont
+                    pas encore disponibles. Aucun diagnostic n’a été effectué.
+                  </p>
+                  <button
+                    className="button-secondary"
+                    onClick={() => navigate("engine")}
+                  >
+                    {demoAvailable
+                      ? "Explorer le moteur en démo"
+                      : "Ouvrir le diagnostic moteur"}
+                    <Icon name="arrow" />
+                  </button>
+                </section>
+              </>
+            )}
+            {demoAvailable && page === "demo" && (
+              <>
+                <div className="page-heading">
+                  <div>
+                    <p className="eyebrow">ENVIRONNEMENT DE TEST</p>
+                    <h1>
+                      Démonstration<span className="heading-dot">.</span>
+                    </h1>
+                    <p className="lead">
+                      Prenez l’outil en main, sans connecter de véhicule.
+                    </p>
+                  </div>
+                  <span className={`tag ${demo ? "text-cyan" : ""}`}>
+                    {demo ? "Démo active" : "Démo inactive"}
+                  </span>
+                </div>
+                <section className="panel demo-panel" aria-label="Mode démo">
+                  <span className="empty-icon">
+                    <Icon name="flask" />
+                  </span>
+                  <h2>
+                    {demo
+                      ? "Un espace pour tout essayer."
+                      : "Découvrez le parcours de diagnostic."}
+                  </h2>
+                  <p className="demo-banner">
+                    {demo
+                      ? "Mode démo — toutes les données et opérations sont simulées"
+                      : "Un véhicule fictif, trois défauts moteur et un parcours complet de lecture et d’effacement."}
+                  </p>
+                  <p className="muted">
+                    Aucun lien avec votre Octavia. Aucun câble nécessaire. Le
+                    scénario reste en mémoire jusqu’à la fermeture de
+                    l’application.
+                  </p>
+                  {!demo ? (
+                    activate
+                  ) : (
+                    <div className="buttons">
+                      <button
+                        className="button-primary"
+                        onClick={() => navigate("engine")}
+                      >
+                        Ouvrir le diagnostic moteur
+                        <Icon name="arrow" />
+                      </button>
+                      <button
+                        className="button-secondary"
+                        disabled={!interruptible}
+                        onClick={() => act({ type: "deactivate" })}
+                      >
+                        Quitter le mode démo
+                      </button>
+                    </div>
+                  )}
+                </section>
+                {demo && (
+                  <section className="panel simulation-settings">
+                    <div className="panel-heading">
+                      <h2>Contrôles du simulateur</h2>
+                      <Icon name="flask" />
+                    </div>
+                    <div className="setting-row">
+                      <div>
+                        <label htmlFor="incident">
+                          Incident à la prochaine opération
+                        </label>
+                        <p>
+                          Testez la gestion d’une absence de réponse ou d’une
+                          déconnexion.
+                        </p>
+                      </div>
+                      <select
+                        id="incident"
+                        disabled={!available || !!busy || confirming}
+                        value={session?.incident ?? ""}
+                        onChange={(event) =>
+                          act({
+                            type: "arm_incident",
+                            incident: (event.target.value ||
+                              null) as Incident | null,
+                          })
+                        }
+                      >
+                        <option value="">Aucun incident</option>
+                        <option value="no_response">Absence de réponse</option>
+                        <option value="connection_interrupted">
+                          Connexion interrompue
+                        </option>
+                      </select>
+                    </div>
+                    <div className="setting-row">
+                      <div>
+                        <h3>Recommencer le scénario</h3>
+                        <p>
+                          Restaure les trois défauts fictifs et déconnecte le
+                          simulateur.
+                        </p>
+                      </div>
+                      <button
+                        className="button-secondary"
+                        disabled={!interruptible}
+                        onClick={() => act({ type: "reset" })}
+                      >
+                        Réinitialiser le scénario
+                      </button>
+                    </div>
+                  </section>
+                )}
+              </>
+            )}
+            <footer className="app-footer">
+              <span>
+                <span className="status-dot online" />
+                Application locale · Sans compte
+              </span>
+              <span>
+                {demo
+                  ? "Données et opérations simulées"
+                  : "Cardiag · Diagnostic automobile"}
+              </span>
+            </footer>
+          </main>
+        </div>
+      </div>
+      {confirming && (
+        <ConfirmClear
+          onCancel={cancelClear}
+          onConfirm={() => act({ type: "clear", confirmed: true })}
+        />
+      )}
     </div>
   );
 }
-
 export default App;

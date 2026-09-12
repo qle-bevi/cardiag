@@ -84,3 +84,11 @@ export async function runDemoAction(
     await invoke<unknown>("run_demo_action", { action, generation }),
   );
 }
+
+// The native build is authoritative: a Tauri debug build may use production Vite assets.
+export async function getDemoAvailable(): Promise<boolean> {
+  const value = await invoke<unknown>("get_demo_available");
+  if (typeof value !== "boolean")
+    throw new Error("Contrat de disponibilité invalide");
+  return value;
+}

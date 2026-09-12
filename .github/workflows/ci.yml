@@ -58,5 +58,7 @@ jobs:
       - run: npm run build
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
+      - name: Test release demo restrictions
+        run: cargo test -p cardiag --locked --config 'profile.dev.package.cardiag.debug-assertions=false'
       - name: Compile desktop application
         run: npm run tauri build -- --no-bundle --ci -- --locked

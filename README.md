@@ -4,7 +4,7 @@
 
 Application de diagnostic automobile locale, développée avec **Rust, Tauri 2, React et TypeScript**. L’objectif est de lire et d’effacer les codes de défaut moteur OBD-II/EOBD des véhicules compatibles.
 
-**État actuel : mode démo fonctionnel.** Activez explicitement la démo pour connecter un véhicule fictif, lire ses défauts et tester leur effacement avec confirmation. Toutes ces données et opérations sont simulées en Rust. Hors démo, la connexion matérielle reste indisponible : aucun accès au câble, aucun diagnostic réel et aucun effacement matériel ne sont effectués.
+**État actuel : mode démo fonctionnel dans les builds de développement uniquement.** Activez explicitement la démo depuis l’interface ou au lancement pour connecter un véhicule fictif, lire ses défauts et tester leur effacement avec confirmation. Toutes ces données et opérations sont simulées en Rust. Hors démo, la connexion matérielle reste indisponible : aucun accès au câble, aucun diagnostic réel et aucun effacement matériel ne sont effectués.
 
 ## Démarrer
 
@@ -34,20 +34,69 @@ Sous PowerShell, définir `$env:CARGO_BUILD_JOBS="2"` avant `npm run tauri dev`.
 
 `npm run dev` ouvre uniquement le serveur de développement web. Dans un navigateur, le statut « État de connexion indisponible » est attendu : le service Rust n’y est pas présent.
 
+## Développement et release
+
+La démo est réservée aux builds Rust **debug** (`npm run tauri dev` ou `npm run tauri build -- --debug`). Les vraies releases (`npm run tauri build`, sans `--debug`, ou `tauri dev --release`) masquent les accès et mentions de démo et refusent toutes les commandes du simulateur côté Rust. `CARDIAG_DEMO`, `--demo` et `--no-demo` y sont ignorés, même si la variable contient une valeur invalide.
+
+L’interface interroge le build natif via `get_demo_available` : elle ne déduit pas cette disponibilité du mode Vite. Elle masque la démo tant que cette information n’est pas disponible. Sans prise en charge matérielle, la release affiche les systèmes comme indisponibles et conserve les actions de diagnostic désactivées.
+
+## Choisir le mode démo au lancement en développement
+
+Dans un build debug, les options `--demo` et `--no-demo` activent ou désactivent la démo au démarrage. Elles sont prioritaires sur la variable d’environnement **d’exécution** `CARDIAG_DEMO` (`1` / `true` pour activer, `0` / `false` pour désactiver). Sans option ni variable, la démo est désactivée. Si plusieurs flags sont présents, le dernier l’emporte. Une valeur d’environnement invalide, sans flag prioritaire, empêche le démarrage avec un message sur stderr et le code de sortie 2.
+
+Avec l’exécutable compilé :
+
+```sh
+./target/debug/cardiag --demo
+./target/debug/cardiag --no-demo
+```
+
+En développement (Linux / macOS) :
+
+```sh
+CARDIAG_DEMO=1 CARGO_BUILD_JOBS=2 npm run tauri dev
+CARDIAG_DEMO=0 CARGO_BUILD_JOBS=2 npm run tauri dev
+
+# Les deux séparateurs après « dev » transmettent le flag à l’application.
+CARGO_BUILD_JOBS=2 npm run tauri -- dev -- -- --demo
+CARGO_BUILD_JOBS=2 npm run tauri -- dev -- -- --no-demo
+```
+
+Sous PowerShell :
+
+```powershell
+$env:CARGO_BUILD_JOBS="2"
+$env:CARDIAG_DEMO="1" # "0" pour démarrer sans démo
+npm run tauri dev
+
+# Ou directement avec le flag :
+.\target\debug\cardiag.exe --demo
+```
+
+En développement, ces options fixent uniquement l’état initial : la connexion au simulateur et la lecture restent manuelles, et les contrôles de **Démonstration** permettent toujours de changer de mode. La variable est lue par Rust au lancement ; elle ne s’applique pas à `npm run dev` dans un navigateur. Aucun chargement automatique de fichier `.env` n’est ajouté.
+
 ## Tester le mode démo
 
 1. Lancer l’application de bureau, puis choisir **Activer le mode démo**. Le bandeau et l’en-tête rappellent que tout est simulé.
-2. Choisir **Connecter le véhicule simulé**, puis **Lire les codes**. Trois défauts fictifs `DEMO-001` à `DEMO-003`, avec descriptions françaises, apparaissent après une courte attente.
-3. Choisir **Effacer les codes**, puis **Annuler** (ou Échap) : les défauts sont conservés. Aucune commande d’effacement n’est envoyée lors de l’annulation.
+2. Choisir **Connecter le véhicule simulé**, ouvrir **Moteur** dans la navigation, puis choisir **Lire les codes**. Trois défauts fictifs `DEMO-001` à `DEMO-003`, avec descriptions françaises, apparaissent après une courte attente.
+3. Choisir **Effacer tous les codes moteur**, puis **Annuler** (ou Échap) : les défauts sont conservés. Aucune commande d’effacement n’est envoyée lors de l’annulation.
 4. Recommencer et choisir **Confirmer l’effacement simulé**. Le succès invite à une nouvelle lecture ; il ne constitue pas lui-même une lecture sans défaut.
 5. Choisir **Lire les codes** : l’application affiche **Aucun défaut relevé dans le véhicule simulé**. Avant toute lecture réussie, elle affiche **Aucune lecture effectuée**.
-6. **Réinitialiser le scénario** restaure les trois défauts, déconnecte le véhicule et annule tout incident ou travail en attente. Reconnecter et relire pour recommencer.
+6. Dans **Démonstration**, **Réinitialiser le scénario** restaure les trois défauts, déconnecte le véhicule et annule tout incident ou travail en attente. Reconnecter et relire pour recommencer.
 
-Le sélecteur **Incident à la prochaine opération** permet de simuler une **Absence de réponse** ou une **Connexion interrompue**. L’incident est consommé par la prochaine connexion, lecture ou tentative d’effacement confirmée. Les opérations normales prennent environ 500 ms, l’absence de réponse 1 500 ms. Une absence de réponse conserve la connexion préexistante ; une interruption impose une reconnexion. Aucun de ces incidents ne supprime les défauts, même pendant un effacement.
+Dans **Démonstration**, le sélecteur **Incident à la prochaine opération** permet de simuler une **Absence de réponse** ou une **Connexion interrompue**. L’incident est consommé par la prochaine connexion, lecture ou tentative d’effacement confirmée. Les opérations normales prennent environ 500 ms, l’absence de réponse 1 500 ms. Une absence de réponse conserve la connexion préexistante ; une interruption impose une reconnexion. Aucun de ces incidents ne supprime les défauts, même pendant un effacement.
 
 Pendant une opération, les autres actions de diagnostic sont bloquées. Déconnecter, réinitialiser ou quitter la démo interrompt l’opération ; une ancienne réponse ne peut rétablir la connexion ou modifier le nouveau scénario. Une déconnexion conserve l’état des défauts du simulateur, mais retire la lecture affichée. Quitter puis réactiver la démo crée un scénario neuf.
 
-La démo est locale, en mémoire, désactivée au démarrage et sans sauvegarde entre lancements. Les codes `DEMO-*` sont inventés pour l’interface : ce ne sont pas des codes OBD normalisés ni des résultats de la Skoda Octavia. La démo ne simule aucun protocole électrique, pilote, moniteur de préparation ou calculateur réel. Aucun câble n’est nécessaire ; la compatibilité du GD101 et de l’Octavia reste non vérifiée.
+La démo est locale, en mémoire, désactivée au démarrage par défaut et sans sauvegarde entre lancements. Les codes `DEMO-*` sont inventés pour l’interface : ce ne sont pas des codes OBD normalisés ni des résultats de la Skoda Octavia. La démo ne simule aucun protocole électrique, pilote, moniteur de préparation ou calculateur réel. Aucun câble n’est nécessaire ; la compatibilité du GD101 et de l’Octavia reste non vérifiée.
+
+## Interface
+
+Le thème graphite et cyan utilise un en-tête intégré avec les commandes réduire, agrandir/restaurer et fermer. La zone libre de l’en-tête permet de déplacer la fenêtre ; un double-clic agrandit ou restaure. Les commandes natives sont masquées dans le navigateur.
+
+La **Vue d’ensemble** présente la connexion et l’état du diagnostic. La navigation donne accès au **Moteur**, puis à **ABS / freinage**, **Airbags**, **Transmission** et **Carrosserie** : ces quatre systèmes sont visibles mais ne sont pas encore pris en charge. **Démonstration** regroupe les contrôles du simulateur. Changer de page conserve la session.
+
+Dans **Moteur**, sélectionner un défaut affiche son détail. L’action **Effacer tous les codes moteur** reste globale, quelle que soit la sélection. Le composant de détail prévoit une action individuelle future, qui ne sera fournie que si le transport et le calculateur la permettent ; aucune nouvelle commande d’effacement individuel n’est implémentée.
 
 ## Commandes
 

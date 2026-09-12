@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getSession,
+  getDemoAvailable,
   runDemoAction,
   errorText,
   isDiagnosticError,
@@ -9,6 +10,7 @@ import {
 } from "./diagnostics";
 
 export function useDiagnosticSession() {
+  const [demoAvailable, setDemoAvailable] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [busy, setBusy] = useState<string | null>("initial");
   const [error, setError] = useState<string | null>(null);
@@ -26,10 +28,13 @@ export function useDiagnosticSession() {
 
   useEffect(() => {
     const request = ++version.current;
-    getSession()
+    Promise.all([getSession(), getDemoAvailable()])
       .then(
-        (next) => {
-          if (request === version.current) accept(next);
+        ([next, allowed]) => {
+          if (request === version.current) {
+            setDemoAvailable(allowed);
+            accept(next);
+          }
         },
         () => {
           if (request === version.current)
@@ -55,6 +60,7 @@ export function useDiagnosticSession() {
     if (
       !state ||
       !available ||
+      !demoAvailable ||
       (pending.current &&
         !(interrupt && ["connect", "read", "clear"].includes(pending.current)))
     )
@@ -107,5 +113,5 @@ export function useDiagnosticSession() {
       }
     }
   };
-  return { session, busy, error, available, run };
+  return { session, busy, error, available, demoAvailable, run };
 }
