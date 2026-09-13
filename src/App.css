@@ -1361,3 +1361,44 @@ dialog .buttons {
   left: 0;
   cursor: nesw-resize;
 }
+
+.hardware-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+  max-width: 100%;
+  min-width: 0;
+}
+.hardware-controls small {
+  display: block;
+  color: var(--muted);
+}
+.hardware-controls select {
+  max-width: 100%;
+  min-width: 0;
+}
+.connection-strip {
+  flex-wrap: wrap;
+}
+
+.code-origin {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.hardware-issues {
+  display: block;
+}
+.hardware-issues ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.code-origin {
+  display: none;
+}
+@media (max-width: 1150px) and (min-width: 901px), (max-width: 700px) {
+  .code-origin {
+    display: block;
+  }
+}

@@ -14,7 +14,9 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+serde.workspace = true
 tauri = { version = "2", features = [] }
+cardiag-j2534 = { path = "../crates/j2534" }
 diagnostic-core = { path = "../crates/diagnostic-core" }
 
 [dev-dependencies]

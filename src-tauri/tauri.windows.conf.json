@@ -1,0 +1,8 @@
+{
+  "bundle": {
+    "resources": {
+      "../target/helpers/cardiag-j2534-x86.exe": "cardiag-j2534-x86.exe",
+      "../target/helpers/cardiag-j2534-x64.exe": "cardiag-j2534-x64.exe"
+    }
+  }
+}

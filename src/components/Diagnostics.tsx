@@ -12,9 +12,11 @@ export type CodeAction = {
 export function CodeDetail({
   code,
   action,
+  demo = true,
 }: {
   code: TroubleCode | null;
   action?: CodeAction;
+  demo?: boolean;
 }) {
   return (
     <aside
@@ -27,28 +29,37 @@ export function CodeDetail({
       </div>
       {code ? (
         <>
-          <span className="tag warning">Défaut simulé</span>
+          <span className="tag warning">
+            {demo
+              ? "Défaut simulé"
+              : code.status === "pending"
+                ? "En attente"
+                : "Mémorisé"}
+          </span>
           <h2 className="detail-code">{code.code}</h2>
           <p className="detail-description">{code.description}</p>
           <dl>
             <div>
               <dt>Système</dt>
-              <dd>Moteur</dd>
+              <dd>{demo ? "Moteur" : "Diagnostic OBD/EOBD"}</dd>
             </div>
             <div>
               <dt>Source</dt>
-              <dd>Simulateur local</dd>
+              <dd>
+                {demo ? "Simulateur local" : `Calculateur ${code.source}`}
+              </dd>
             </div>
             <div>
               <dt>Nature du code</dt>
-              <dd>Fictif · non normalisé</dd>
+              <dd>{demo ? "Fictif · non normalisé" : "Code OBD/EOBD"}</dd>
             </div>
           </dl>
           <div className="detail-note">
             <Icon name="shield" />
             <p>
-              Ce défaut appartient au véhicule fictif. Il ne constitue pas un
-              diagnostic de votre véhicule.
+              {demo
+                ? "Ce défaut appartient au véhicule fictif. Il ne constitue pas un diagnostic de votre véhicule."
+                : "Le code est rapporté par le calculateur indiqué. Son libellé et son interprétation demandent une documentation adaptée au véhicule."}
             </p>
           </div>
           {action && (
@@ -97,10 +108,16 @@ export function Diagnostics({
     code: string;
     reading: TroubleCode[];
   } | null>(null);
+  const demo = session?.demo ?? false;
+  const partial = session?.hardware?.partial ?? false;
   const reading = session?.reading;
   const selected =
     selection?.reading === reading
-      ? (reading?.find((code) => code.code === selection?.code) ?? null)
+      ? (reading?.find(
+          (code) =>
+            `${code.source ?? ""}:${code.status ?? ""}:${code.code}` ===
+            selection?.code,
+        ) ?? null)
       : null;
   const working = busy === "read" || busy === "clear";
   return (
@@ -117,18 +134,26 @@ export function Diagnostics({
       <div className="diagnostic-toolbar">
         <span className="tag">
           <span className={`status-dot ${reading ? "online" : ""}`} />
-          {reading ? "Lecture simulée effectuée" : "Diagnostic non effectué"}
+          {reading
+            ? demo
+              ? "Lecture simulée effectuée"
+              : partial
+                ? "Lecture partielle"
+                : "Lecture effectuée"
+            : "Diagnostic non effectué"}
         </span>
         <div className="buttons">
-          <button
-            className="button-danger"
-            ref={clearButton}
-            disabled={!ready || confirming || !reading?.length}
-            onClick={onClear}
-          >
-            <Icon name="trash" />
-            Effacer tous les codes moteur
-          </button>
+          {demo && (
+            <button
+              className="button-danger"
+              ref={clearButton}
+              disabled={!ready || confirming || !reading?.length}
+              onClick={onClear}
+            >
+              <Icon name="trash" />
+              Effacer tous les codes moteur
+            </button>
+          )}
           <button
             className="button-primary"
             disabled={!ready || confirming}
@@ -155,10 +180,16 @@ export function Diagnostics({
                 </span>
                 <h3>
                   {busy === "read"
-                    ? "Lecture des défauts simulés…"
+                    ? demo
+                      ? "Lecture des défauts simulés…"
+                      : "Lecture des défauts OBD/EOBD…"
                     : "Effacement simulé en cours…"}
                 </h3>
-                <p>Communication avec le simulateur local.</p>
+                <p>
+                  {demo
+                    ? "Communication avec le simulateur local."
+                    : "Communication avec les calculateurs OBD/EOBD."}
+                </p>
               </div>
             ) : reading?.length ? (
               <>
@@ -168,12 +199,17 @@ export function Diagnostics({
                 </div>
                 <ul className="code-list">
                   {reading.map((code) => (
-                    <li key={code.code}>
+                    <li
+                      key={`${code.source ?? ""}:${code.status ?? ""}:${code.code}`}
+                    >
                       <button
-                        className={`code-row ${selected?.code === code.code ? "selected" : ""}`}
-                        aria-pressed={selected?.code === code.code}
+                        className={`code-row ${selected === code ? "selected" : ""}`}
+                        aria-pressed={selected === code}
                         onClick={() =>
-                          setSelection({ code: code.code, reading })
+                          setSelection({
+                            code: `${code.source ?? ""}:${code.status ?? ""}:${code.code}`,
+                            reading,
+                          })
                         }
                       >
                         <span className="fault-icon">
@@ -182,8 +218,20 @@ export function Diagnostics({
                         <span className="code-summary">
                           <strong>{code.code}</strong>
                           <span>{code.description}</span>
+                          {!demo && (
+                            <span className="code-origin">
+                              {code.source} ·{" "}
+                              {code.status === "pending"
+                                ? "En attente"
+                                : "Mémorisé"}
+                            </span>
+                          )}
                         </span>
-                        <small>Défaut fictif</small>
+                        <small>
+                          {demo
+                            ? "Défaut fictif"
+                            : `${code.source} · ${code.status === "pending" ? "En attente" : "Mémorisé"}`}
+                        </small>
                         <Icon name="chevron" />
                       </button>
                     </li>
@@ -192,40 +240,63 @@ export function Diagnostics({
               </>
             ) : (
               <div className="empty-state">
-                <span className={`empty-icon ${reading ? "success" : ""}`}>
-                  <Icon name={reading ? "check" : "scan"} />
+                <span
+                  className={`empty-icon ${reading && !partial ? "success" : ""}`}
+                >
+                  <Icon name={reading && !partial ? "check" : "scan"} />
                 </span>
                 <h3>
                   {reading
-                    ? "Aucun défaut relevé dans le véhicule simulé"
+                    ? demo
+                      ? "Aucun défaut relevé dans le véhicule simulé"
+                      : partial
+                        ? "Lecture incomplète — absence de défaut non confirmée"
+                        : "Aucun défaut OBD relevé"
                     : session?.cleared
                       ? "Effacement simulé réussi — relisez les codes pour vérifier"
                       : "Aucune lecture effectuée"}
                 </h3>
                 <p>
                   {reading
-                    ? "La dernière lecture du simulateur ne contient aucun code."
+                    ? demo
+                      ? "La dernière lecture du simulateur ne contient aucun code."
+                      : "Résultat limité aux services et calculateurs interrogés."
                     : session?.demo
                       ? "Les défauts fictifs apparaîtront ici après une lecture réussie."
-                      : demoAvailable
-                        ? "Activez le mode démo pour tester le parcours. La connexion matérielle n’est pas encore disponible."
-                        : "La connexion matérielle n’est pas encore disponible."}
+                      : session?.hardware?.available
+                        ? "Connectez le véhicule, contact mis, puis lancez la lecture. Le profil proposé reste à valider sur votre véhicule."
+                        : demoAvailable
+                          ? "Activez le mode démo pour tester le parcours. La connexion matérielle n’est pas encore disponible."
+                          : "La connexion matérielle n’est pas encore disponible."}
                 </p>
               </div>
             )}
           </div>
+          {partial && (
+            <div role="alert" className="error-message hardware-issues">
+              Lecture partielle
+              <ul>
+                {session?.hardware?.issues.map((issue) => (
+                  <li key={issue}>{issue}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="panel-footnote">
             <Icon name="shield" />
             {session?.demo
               ? "Toutes les lectures et tous les effacements sont simulés."
-              : "Lecture et effacement matériels non disponibles."}
+              : session?.hardware?.available
+                ? "Lecture OBD/EOBD uniquement · Aucun effacement matériel."
+                : "Lecture et effacement matériels non disponibles."}
           </div>
         </section>
-        <CodeDetail code={working ? null : selected} />
+        <CodeDetail demo={demo} code={working ? null : selected} />
       </div>
       <p className="scope-note">
-        L’effacement actuel concerne tous les codes moteur. L’effacement
-        individuel dépendra des capacités du transport et du calculateur.
+        {demo
+          ? "L’effacement actuel concerne tous les codes moteur. L’effacement individuel dépendra des capacités du transport et du calculateur."
+          : "Les résultats concernent les défauts OBD/EOBD des calculateurs répondants. Les autres systèmes ne sont pas interrogés."}
       </p>
     </>
   );

@@ -6,6 +6,10 @@ use serde::{Deserialize, Serialize};
 pub struct TroubleCode {
     pub code: String,
     pub description: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
 }
 
 /// Hardware transports can implement this boundary in a separate crate.
@@ -38,6 +42,8 @@ impl Default for Simulator {
             .map(|(code, description)| TroubleCode {
                 code: code.into(),
                 description: description.into(),
+                status: None,
+                source: None,
             })
             .collect(),
         }
@@ -74,6 +80,12 @@ impl DiagnosticTransport for Simulator {
 #[serde(rename_all = "snake_case")]
 pub enum DiagnosticError {
     HardwareUnavailable,
+    DriverUnavailable,
+    CableUnavailable,
+    UnsupportedProfile,
+    InvalidResponse,
+    OperationUnsupported,
+    HelperUnavailable,
     NotConnected,
     Busy,
     InvalidState,
@@ -114,6 +126,8 @@ pub enum Action {
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize)]
 pub struct SessionSnapshot {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hardware: Option<HardwareInfo>,
     pub generation: u64,
     pub demo: bool,
     pub connected: bool,
@@ -284,3 +298,12 @@ impl DemoSession {
 
 #[cfg(test)]
 mod tests;
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HardwareInfo {
+    pub available: bool,
+    pub interface: Option<String>,
+    pub profile: Option<String>,
+    pub partial: bool,
+    pub issues: Vec<String>,
+}

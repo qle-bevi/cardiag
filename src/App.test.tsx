@@ -140,7 +140,9 @@ describe("parcours de diagnostic simulé", () => {
       await screen.findByText("Connexion matérielle non disponible"),
     ).toBeVisible();
     expect(screen.getByText("Aucune lecture effectuée")).toBeVisible();
-    expect(button("Effacer tous les codes moteur")).toBeDisabled();
+    expect(
+      screen.queryByRole("button", { name: "Effacer tous les codes moteur" }),
+    ).not.toBeInTheDocument();
     expect(ipc).toHaveBeenCalledTimes(2);
     expect(ipc).toHaveBeenCalledWith("get_session", {});
     expect(ipc).toHaveBeenCalledWith("get_demo_available", {});
@@ -528,7 +530,9 @@ describe("interface de release", () => {
     }
     await navigate("Moteur");
     expect(button("Lire les codes")).toBeDisabled();
-    expect(button("Effacer tous les codes moteur")).toBeDisabled();
+    expect(
+      screen.queryByRole("button", { name: "Effacer tous les codes moteur" }),
+    ).not.toBeInTheDocument();
     expect(
       ipc.mock.calls.some(([command]) => command === "run_demo_action"),
     ).toBe(false);

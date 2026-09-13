@@ -1,15 +1,19 @@
 import { describe, expect, it } from "vitest";
+import hardware from "../../tests/fixtures/hardware-session.json";
 import fixtures from "../../tests/fixtures/demo-session.json";
 import { mockIPC } from "@tauri-apps/api/mocks";
 import { getDemoAvailable, parseSession } from "./diagnostics";
 
 describe("contrat IPC Rust/TypeScript", () => {
   it("accepte les états produits par Rust", () => {
+    expect(parseSession(hardware)).toEqual(hardware);
     for (const [name, value] of Object.entries(fixtures)) {
       if (name !== "clearAction") expect(parseSession(value)).toEqual(value);
     }
   });
   it.each([
+    { ...hardware, hardware: { ...hardware.hardware, partial: "yes" } },
+    { ...hardware, reading: [{ ...hardware.reading[0], status: "invented" }] },
     null,
     {},
     { ...fixtures.initial, generation: -1 },

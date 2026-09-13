@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { type Action, type Incident } from "./lib/diagnostics";
+import {
+  type Action,
+  type Incident,
+  type HardwareAction,
+} from "./lib/diagnostics";
 import { useDiagnosticSession } from "./lib/useDiagnosticSession";
 import { systems, type Page } from "./lib/systems";
 import { Icon } from "./components/Icon";
@@ -7,6 +11,7 @@ import { TitleBar } from "./components/TitleBar";
 import { VehicleIllustration } from "./components/VehicleIllustration";
 import { Diagnostics, ConfirmClear } from "./components/Diagnostics";
 import "./App.css";
+import { HardwareConnection } from "./components/HardwareConnection";
 
 function App() {
   const { session, busy, error, available, demoAvailable, run } =
@@ -25,14 +30,24 @@ function App() {
     wasConfirming.current = confirming;
   }, [confirming]);
   const demo = demoAvailable && (session?.demo ?? false);
+  const hardwareAvailable = session?.hardware?.available ?? false;
   const visibleSystems = systems.map((item) =>
-    demoAvailable ? item : { ...item, availability: "unavailable" as const },
+    item.id === "engine" && hardwareAvailable
+      ? { ...item, availability: "hardware" as const }
+      : demoAvailable
+        ? item
+        : { ...item, availability: "unavailable" as const },
   );
   const connected = session?.connected ?? false;
   const interruptible =
     available && (!busy || ["connect", "read", "clear"].includes(busy));
-  const ready = available && demo && connected && !busy && !session?.operation;
-  const act = (action: Action) => {
+  const ready =
+    available &&
+    (demo || hardwareAvailable) &&
+    connected &&
+    !busy &&
+    !session?.operation;
+  const act = (action: Action | HardwareAction) => {
     setConfirming(false);
     void run(action);
   };
@@ -50,7 +65,13 @@ function App() {
       : !available
         ? "État de connexion indisponible"
         : !demo
-          ? "Connexion matérielle non disponible"
+          ? hardwareAvailable
+            ? busy === "connect"
+              ? "Connexion au véhicule en cours…"
+              : connected
+                ? "Véhicule connecté"
+                : "Véhicule déconnecté"
+            : "Connexion matérielle non disponible"
           : busy === "connect"
             ? "Connexion simulée en cours…"
             : connected
@@ -63,7 +84,7 @@ function App() {
       : busy === "clear"
         ? "Effacement en cours…"
         : reading
-          ? `${reading.length} défaut${reading.length > 1 ? "s" : ""} simulé${reading.length > 1 ? "s" : ""}`
+          ? `${reading.length} défaut${reading.length > 1 ? "s" : ""}${demo ? ` simulé${reading.length > 1 ? "s" : ""}` : ""}${session?.hardware?.partial ? " · lecture partielle" : ""}`
           : session?.cleared
             ? "Relecture nécessaire"
             : "Aucune lecture effectuée";
@@ -71,7 +92,7 @@ function App() {
   const activate = demoAvailable && (
     <button
       className="button-primary"
-      disabled={!available || !!busy}
+      disabled={!available || (!!busy && !["connect", "read"].includes(busy))}
       onClick={() => act({ type: "activate" })}
     >
       <Icon name="flask" />
@@ -187,6 +208,12 @@ function App() {
                   </button>
                 )}
               </div>
+            ) : hardwareAvailable && session ? (
+              <HardwareConnection
+                session={session}
+                busy={busy}
+                onAction={act}
+              />
             ) : (
               <span className="connection-hint">
                 Aucun matériel pris en charge pour le moment
@@ -263,13 +290,21 @@ function App() {
                 <div className="overview-stats">
                   <div>
                     <span className="micro-label">SESSION</span>
-                    <strong>{demo ? "Démonstration" : "Non démarrée"}</strong>
+                    <strong>
+                      {demo
+                        ? "Démonstration"
+                        : connected
+                          ? "Véhicule connecté"
+                          : "Non démarrée"}
+                    </strong>
                     <span>
                       {demo
                         ? "Toutes les opérations sont simulées"
-                        : demoAvailable
-                          ? "Activez la démo pour explorer"
-                          : "Aucun véhicule connecté"}
+                        : hardwareAvailable
+                          ? "Lecture OBD/EOBD · GD101"
+                          : demoAvailable
+                            ? "Activez la démo pour explorer"
+                            : "Aucun véhicule connecté"}
                     </span>
                   </div>
                   <div>
@@ -279,16 +314,20 @@ function App() {
                     </strong>
                     <span>
                       {reading
-                        ? "Résultat du simulateur"
+                        ? demo
+                          ? "Résultat du simulateur"
+                          : "Défauts OBD/EOBD · sources identifiées"
                         : "Aucun résultat matériel"}
                     </span>
                   </div>
                   <div>
                     <span className="micro-label">DISPONIBILITÉ</span>
                     <strong>
-                      {demoAvailable
-                        ? "Moteur en démo"
-                        : "Connexion matérielle à venir"}
+                      {hardwareAvailable
+                        ? "Lecture moteur sous Windows"
+                        : demoAvailable
+                          ? "Moteur en démo"
+                          : "Connexion matérielle à venir"}
                     </strong>
                     <span>Autres systèmes à venir</span>
                   </div>
@@ -301,7 +340,7 @@ function App() {
                   {visibleSystems.map((item) => (
                     <button
                       key={item.id}
-                      className={`system-card ${item.availability === "demo" ? "supported" : ""}`}
+                      className={`system-card ${item.availability !== "unavailable" ? "supported" : ""}`}
                       onClick={() => navigate(item.id)}
                     >
                       <span className="system-icon">
@@ -312,11 +351,13 @@ function App() {
                         <span>{item.description}</span>
                       </span>
                       <span
-                        className={`system-availability ${item.availability === "demo" ? "text-cyan" : ""}`}
+                        className={`system-availability ${item.availability !== "unavailable" ? "text-cyan" : ""}`}
                       >
-                        {item.availability === "demo"
-                          ? "Disponible en démo"
-                          : "Non disponible"}
+                        {item.availability === "hardware"
+                          ? "Lecture OBD/EOBD"
+                          : item.availability === "demo"
+                            ? "Disponible en démo"
+                            : "Non disponible"}
                       </span>
                       <Icon name="chevron" />
                     </button>

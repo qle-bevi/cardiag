@@ -88,7 +88,7 @@ export function TitleBar({
         </div>
         <div className="titlebar-status">
           <span className={`status-dot ${connected ? "online" : ""}`} />
-          {connected ? "Connecté · simulé" : "Hors ligne"}
+          {connected ? (demo ? "Connecté · simulé" : "Connecté") : "Hors ligne"}
         </div>
         {demo && (
           <span

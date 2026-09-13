@@ -36,10 +36,30 @@ Sur les postes cibles, vérifier encore : déplacement par la zone libre de l’
 
 ## Essais matériels
 
-Non effectués et non disponibles. Le GD101 et la Skoda Octavia diesel de 2005 restent des cibles de test, sans garantie de compatibilité. Les résultats futurs devront préciser le système, l’architecture et la version du pilote, le véhicule et le protocole effectivement utilisés.
+Le transport J2534 est implémenté ; aucun essai GD101/véhicule n’a été effectué. La cible est une Skoda Octavia II 1Z diesel de 2005. La compilation et les essais avec bibliothèque factice ne valident pas cette compatibilité.
+
+Premier contrôle sous Windows, hors démo :
+
+1. Noter la version de Windows, la version du pilote, l’architecture de la DLL, la motorisation et la référence du calculateur si connue.
+2. Vérifier l’absence de pilote, puis la découverte après installation et actualisation. Avec plusieurs interfaces, vérifier que seule l’interface choisie est utilisée.
+3. Brancher le câble et mettre le contact. Vérifier que le statut connecté attend une réponse OBD ; sans véhicule ou sans réponse, aucun succès ne doit être affiché.
+4. Lire les services 03/07. Comparer codes, statuts et sources avec un outil de référence compatible, sans effacer les défauts. Conserver le journal local et le profil effectivement confirmé.
+5. Débrancher pendant une lecture, puis reconnecter : l’application reste réactive et une réponse ancienne ne restaure pas la session. Vérifier également fermeture et relancement sans processus auxiliaire orphelin.
+6. Contrôler les états vide, partiel et erreur, ainsi que l’absence de bouton d’effacement réel. Le rejet de l’effacement par IPC est couvert séparément.
+7. Vérifier la fenêtre native aux tailles minimale et normale, le clavier et les paramètres de mise à l’échelle Windows.
+
+La CI prépare et distribue les auxiliaires x86/x64, et teste l’ABI avec la bibliothèque factice sur les deux architectures Windows. Le parcours matériel React utilise un IPC simulé. Les commandes de la suite native sont documentées dans le README. Les tests de protocole partagent les fixtures Rust/TypeScript pour conserver la source, le statut et la lecture partielle.
+
+Références de développement : [API J2534](https://quantexlab.de/en/develop/j2534.html), [services OBD/EOBD](https://www.ross-tech.com/vcds/tour/obd-2.php), [diagnostic CAN du châssis 1Z](https://fr.ross-tech.com/canbus.htm).
 
 ## Démo réservée au développement
 
 La disponibilité provient du build Rust (`debug_assertions`), via la commande `get_demo_available`. Les tests frontend couvrent les deux réponses natives avec les mêmes composants : démo disponible en debug, aucun accès ni mention de démo dans les pages de release, absence d’apparition transitoire pendant le chargement et rejet des réponses malformées.
 
 La CI exécute aussi `cargo test -p cardiag --locked --config 'profile.dev.package.cardiag.debug-assertions=false'`. Cette commande compile le code conditionnel de release du paquet applicatif sans imposer une recompilation optimisée de toutes les dépendances. Elle vérifie notamment que chaque action de simulation est refusée par le gestionnaire IPC de release. Les tests du démarrage vérifient que flags et variable d’environnement, y compris invalides, ne peuvent pas activer la démo lorsque celle-ci est indisponible. La compilation Tauri optimisée reste assurée par l’étape de build de la CI.
+
+## Contrôles du jalon moteur dans cet environnement
+
+Contrôle navigateur Chromium effectué avec IPC matériel simulé à **1100 × 760** et **640 × 580** : connexion, lecture partielle, deux occurrences d’un même code provenant de calculateurs/statuts différents et sélection du détail. Aucun débordement horizontal ni erreur JavaScript observé. Ce contrôle ne valide pas la WebView Windows.
+
+Les sources du transport, de l’auxiliaire et du pilote factice passent `cargo check --all-targets` pour **x86_64-pc-windows-msvc** et **i686-pc-windows-msvc** depuis Linux. L’exécution Windows et les essais du GD101 réel restent à effectuer sur le poste cible ; les jobs Windows de la CI ont été ajoutés mais n’ont pas été exécutés depuis cette session.

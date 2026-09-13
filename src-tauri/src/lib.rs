@@ -1,13 +1,13 @@
+mod hardware;
+mod service;
 mod startup;
 
 use std::sync::Mutex;
 #[cfg(debug_assertions)]
 use std::time::Duration;
 
-use diagnostic_core::{Action, DemoSession, DiagnosticError, SessionSnapshot};
-use tauri::State;
-
-type Service = Mutex<DemoSession>;
+use diagnostic_core::{Action, DiagnosticError, SessionSnapshot};
+use service::Service;
 
 #[tauri::command]
 fn get_demo_available() -> bool {
@@ -15,11 +15,17 @@ fn get_demo_available() -> bool {
 }
 
 #[tauri::command]
-fn get_session(state: State<'_, Service>) -> Result<SessionSnapshot, DiagnosticError> {
-    Ok(state
-        .lock()
-        .map_err(|_| DiagnosticError::ServiceUnavailable)?
-        .snapshot())
+async fn get_session(app: tauri::AppHandle) -> Result<SessionSnapshot, DiagnosticError> {
+    tauri::async_runtime::spawn_blocking(move || {
+        use tauri::Manager;
+        let state = app.state::<Mutex<Service>>();
+        let service = state
+            .lock()
+            .map_err(|_| DiagnosticError::ServiceUnavailable)?;
+        Ok(service.snapshot())
+    })
+    .await
+    .map_err(|_| DiagnosticError::ServiceUnavailable)?
 }
 
 #[cfg(debug_assertions)]
@@ -32,13 +38,28 @@ async fn run_demo_action(
     // The bounded simulated wait runs on the blocking pool, never the UI thread.
     tauri::async_runtime::spawn_blocking(move || {
         use tauri::Manager;
-        let state = app.state::<Service>();
-        let ticket = {
+        let state = app.state::<Mutex<Service>>();
+        let (ticket, expected_generation) = {
             let mut session = state
                 .lock()
                 .map_err(|_| DiagnosticError::ServiceUnavailable)?;
-            match session.begin(action, generation)? {
-                Some(ticket) => ticket,
+            session.validate(generation)?;
+            if matches!(
+                action,
+                Action::Activate | Action::Deactivate | Action::Disconnect | Action::Reset
+            ) {
+                // Validate demo controls before interrupting any session.
+                if matches!(action, Action::Activate) && session.demo.snapshot().demo {
+                    return Err(DiagnosticError::InvalidState);
+                }
+                if !matches!(action, Action::Activate) && !session.demo.snapshot().demo {
+                    return Err(DiagnosticError::HardwareUnavailable);
+                }
+                session.interrupt();
+            }
+            let demo_generation = session.demo.snapshot().generation;
+            match session.demo.begin(action, demo_generation)? {
+                Some(ticket) => (ticket, session.generation),
                 None => return Ok(session.snapshot()),
             }
         };
@@ -46,7 +67,9 @@ async fn run_demo_action(
         let mut session = state
             .lock()
             .map_err(|_| DiagnosticError::ServiceUnavailable)?;
-        session.finish(ticket)
+        session.validate(expected_generation)?;
+        session.demo.finish(ticket)?;
+        Ok(session.snapshot())
     })
     .await
     .map_err(|_| DiagnosticError::ServiceUnavailable)?
@@ -99,12 +122,22 @@ pub fn run() {
         std::process::exit(2);
     });
     tauri::Builder::default()
-        .manage(Mutex::new(session))
+        .manage(Mutex::new(Service::new(session)))
         .invoke_handler(tauri::generate_handler![
             get_session,
             get_demo_available,
-            run_demo_action
+            run_demo_action,
+            hardware::list_hardware_interfaces,
+            hardware::run_hardware_action
         ])
-        .run(tauri::generate_context!())
-        .expect("Impossible de démarrer Cardiag");
+        .build(tauri::generate_context!())
+        .expect("Impossible de démarrer Cardiag")
+        .run(|app, event| {
+            if matches!(event, tauri::RunEvent::Exit) {
+                use tauri::Manager;
+                if let Ok(mut service) = app.state::<Mutex<Service>>().lock() {
+                    service.interrupt();
+                }
+            }
+        });
 }

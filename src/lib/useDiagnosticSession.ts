@@ -3,6 +3,9 @@ import {
   getSession,
   getDemoAvailable,
   runDemoAction,
+  runHardwareAction,
+  diagnosticErrorText,
+  type HardwareAction,
   errorText,
   isDiagnosticError,
   type Action,
@@ -23,7 +26,7 @@ export function useDiagnosticSession() {
     current.current = next;
     setSession(next);
     setAvailable(true);
-    setError(next.error ? errorText[next.error] : null);
+    setError(next.error ? diagnosticErrorText(next.error, next.demo) : null);
   }, []);
 
   useEffect(() => {
@@ -52,15 +55,18 @@ export function useDiagnosticSession() {
     };
   }, [accept]);
 
-  const run = async (action: Action) => {
+  const run = async (action: Action | HardwareAction) => {
     const state = current.current;
-    const interrupt = ["disconnect", "reset", "deactivate"].includes(
-      action.type,
-    );
+    const interrupt = [
+      "disconnect",
+      "reset",
+      "deactivate",
+      "activate",
+    ].includes(action.type);
     if (
       !state ||
       !available ||
-      !demoAvailable ||
+      (state.demo && !demoAvailable) ||
       (pending.current &&
         !(interrupt && ["connect", "read", "clear"].includes(pending.current)))
     )
@@ -78,7 +84,11 @@ export function useDiagnosticSession() {
         operation: null,
       });
     try {
-      const next = await runDemoAction(action, state.generation);
+      const demoAction = state.demo || action.type === "activate";
+      if (demoAction && !demoAvailable) return;
+      const next = demoAction
+        ? await runDemoAction(action as Action, state.generation)
+        : await runHardwareAction(action as HardwareAction, state.generation);
       if (request === version.current) accept(next);
     } catch (cause) {
       if (request !== version.current) return;
@@ -89,7 +99,7 @@ export function useDiagnosticSession() {
           accept(next);
           setError(
             isDiagnosticError(cause)
-              ? errorText[cause]
+              ? diagnosticErrorText(cause, state.demo)
               : errorText.service_unavailable,
           );
         }

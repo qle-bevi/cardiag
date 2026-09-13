@@ -1,0 +1,24 @@
+{
+  "generation": 0,
+  "demo": false,
+  "connected": true,
+  "operation": null,
+  "reading": [
+    {
+      "code": "P0133",
+      "description": "Description non disponible",
+      "status": "stored",
+      "source": "0x7E8"
+    }
+  ],
+  "cleared": false,
+  "incident": null,
+  "error": null,
+  "hardware": {
+    "available": true,
+    "interface": "Godiag GD101",
+    "profile": "ISO 15765 · CAN 11 bits · 500 kbit/s",
+    "partial": true,
+    "issues": ["Calculateur 0x7E8, service 07 : réponse absente ou multiple"]
+  }
+}

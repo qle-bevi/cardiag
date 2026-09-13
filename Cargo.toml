@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/diagnostic-core", "src-tauri"]
+members = ["crates/diagnostic-core", "src-tauri", "crates/j2534", "crates/fake-j2534"]
 resolver = "2"
 
 [workspace.package]

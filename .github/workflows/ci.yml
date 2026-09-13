@@ -54,10 +54,22 @@ jobs:
       - name: Install pinned Rust toolchain
         run: rustup toolchain install --no-self-update
       - run: npm ci
+      - name: Build Windows J2534 helpers
+        if: runner.os == 'Windows'
+        run: node scripts/native.mjs helpers
       - run: cargo fmt --all -- --check
       - run: npm run build
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
+      - name: Build fake J2534 driver
+        run: cargo build -p fake-j2534 --locked
+      - name: Test J2534 process and native ABI
+        run: cargo test -p cardiag-j2534 --test helper --locked -- --include-ignored
+      - name: Test Windows x86 driver and helper
+        if: runner.os == 'Windows'
+        run: |
+          cargo build -p fake-j2534 --target i686-pc-windows-msvc --locked
+          cargo test -p cardiag-j2534 --test helper --target i686-pc-windows-msvc --locked -- --include-ignored
       - name: Test release demo restrictions
         run: cargo test -p cardiag --locked --config 'profile.dev.package.cardiag.debug-assertions=false'
       - name: Compile desktop application

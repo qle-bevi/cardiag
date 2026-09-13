@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "identifier": "io.github.qle-bevi.cardiag",
   "build": {
-    "beforeDevCommand": "npm run dev",
+    "beforeDevCommand": "node scripts/native.mjs dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "npm run build",
+    "beforeBuildCommand": "node scripts/native.mjs build",
     "frontendDist": "../dist"
   },
   "app": {

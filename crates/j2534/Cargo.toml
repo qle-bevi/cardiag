@@ -1,0 +1,14 @@
+[package]
+name = "cardiag-j2534"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+diagnostic-core = { path = "../diagnostic-core" }
+serde.workspace = true
+serde_json.workspace = true
+libloading = "0.8"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.55"

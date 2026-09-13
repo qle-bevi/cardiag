@@ -265,3 +265,29 @@ fn snapshots_match_shared_ipc_fixtures() {
     let action: Action = serde_json::from_value(fixtures["clearAction"].clone()).unwrap();
     assert!(matches!(action, Action::Clear { confirmed: true }));
 }
+
+#[test]
+fn hardware_snapshot_matches_shared_contract() {
+    let snapshot = SessionSnapshot {
+        connected: true,
+        hardware: Some(HardwareInfo {
+            available: true,
+            interface: Some("Godiag GD101".into()),
+            profile: Some("ISO 15765 · CAN 11 bits · 500 kbit/s".into()),
+            partial: true,
+            issues: vec!["Calculateur 0x7E8, service 07 : réponse absente ou multiple".into()],
+        }),
+        reading: Some(vec![TroubleCode {
+            code: "P0133".into(),
+            description: "Description non disponible".into(),
+            status: Some("stored".into()),
+            source: Some("0x7E8".into()),
+        }]),
+        ..Default::default()
+    };
+    let fixture: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/hardware-session.json"
+    ))
+    .unwrap();
+    assert_eq!(serde_json::to_value(snapshot).unwrap(), fixture);
+}
